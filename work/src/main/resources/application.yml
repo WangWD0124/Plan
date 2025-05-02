@@ -1,0 +1,21 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: work
+
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/myprojectdb?useSSL=false&serverTimezone=UTC
+    username: root
+    password: 123456
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true # 字段下划线转驼峰
+  global-config:
+    db-config:
+      logic-delete-field: status # 逻辑删除字段
+      logic-delete-value: 0      # 删除状态值
+      logic-not-delete-value: 1  # 未删除状态值

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en" style="height: 100%">
+<head>
+  <meta charset="utf-8">
+  <style>
+    .control-panel {
+      position: fixed;
+      right: 40px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .action-btn {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      color: white;
+      transition: all 0.3s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    #sleepBtn {
+      background-color: #409EFF;
+    }
+
+    #wakeBtn {
+      background-color: #67C23A;
+    }
+
+    .action-btn:disabled {
+      background-color: #C0C4CC;
+      cursor: not-allowed;
+    }
+  </style>
+</head>
+<body style="height: 100%; margin: 0">
+  <div id="container" style="height: 100%"></div>
+  <div class="control-panel">
+    <button class="action-btn" id="sleepBtn">入睡</button>
+    <button class="action-btn" id="wakeBtn">起床</button>
+  </div>
+  
+  <script type="text/javascript" src="https://fastly.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+  
+  <script type="text/javascript">
+
+    // 初始化逻辑
+    initChart();
+
+    // 按钮状态控制
+    function updateButtonState() {
+      const now = new Date();
+      const hours = now.getHours();
+      const sleepBtn = document.getElementById('sleepBtn');
+
+      // 12:00-22:00 (12-22时) 禁用入睡按钮
+      sleepBtn.disabled = hours >= 12 && hours < 22;
+    }
+
+    // 每分钟检查一次按钮状态
+    setInterval(updateButtonState, 60000);
+    updateButtonState(); // 初始化状态
+
+    // 入睡按钮点击
+    document.getElementById('sleepBtn').addEventListener('click', async () => {
+      try {
+        const response = await fetch('/item-records/sleep', {
+          method: 'POST'
+        });
+        if (response.ok) {
+          alert('入睡时间记录成功');
+          initChart(); // 刷新图表
+        }
+      } catch (e) {
+        console.error('记录失败:', e);
+      }
+    });
+
+    // 起床按钮点击
+    document.getElementById('wakeBtn').addEventListener('click', async () => {
+      try {
+        const response = await fetch('/item-records/wake', {
+          method: 'PUT'
+        });
+        if (response.ok) {
+          alert('起床时间记录成功');
+          initChart(); // 刷新图表
+        }
+      } catch (e) {
+        console.error('记录失败:', e);
+      }
+    });
+
+    // 动态获取数据
+    async function loadChartData() {
+      try {
+        const response = await fetch('http://localhost:8081/item-records/chart-data');
+        const data = await response.json();
+        return data;
+      } catch (error) {
+        console.error('数据加载失败:', error);
+        return null;
+      }
+    }
+
+    // 初始化图表
+    async function initChart() {
+      const chartData = await loadChartData();
+      if (!chartData) return;
+
+      var dom = document.getElementById('container');
+      var myChart = echarts.init(dom, null, {
+        renderer: 'canvas',
+        useDirtyRect: false
+      });
+      var app = {};
+
+      var option;
+
+      option = {
+        title: {
+          text: '作息',
+          subtext: '睡眠'
+        },
+        tooltip: {
+          trigger: 'axis',
+          axisPointer: {
+            type: 'shadow'
+          },
+          formatter: function (params) {
+            var tar = params[1];
+            if (tar != null) {
+              return tar.name + '<br/>' + tar.seriesName + ' : ' + tar.value;
+            }
+            return '';
+          }
+        },
+        grid: {
+          left: '3%',
+          right: '8%',
+          bottom: '6%',
+          containLabel: true
+        },
+        dataZoom: {
+          start: 30,
+          type: "inside"
+        },
+        xAxis: {
+          type: 'category',
+          position: 'top',
+          axisLine: {
+            show: false
+          },
+          splitLine: {show: false},
+          offset: 30,
+          data: chartData.dateArray  // 动态生成的日期数组
+        },
+        yAxis: {
+          type: 'value',
+          offset: 30,
+          inverse: true,
+          min: 22,  // 开始于22点
+          max: 46,  // 结束于次日22点（22+24）
+          interval: 1, // 每小时显示刻度
+          axisLabel: {
+            color: '#999',
+            formatter: value => {
+              const hour = value >= 24 ? value - 24 : value;
+              return `${Math.floor(hour).toString().padStart(2, '0')}:00`;
+            }
+          },
+          splitLine: {
+            lineStyle: {
+              color: ['#eee', '#eee', '#aaa', '#eee', '#eee', '#eee', '#eee', '#eee', '#eee', '#eee', '#aaa', '#eee', '#eee', '#eee', '#eee', '#eee', '#eee', '#eee', '#eee', '#eee', '#eee', '#eee', '#eee']
+            }
+          },
+          splitArea: {
+            show: true,
+            areaStyle: {
+              color: ['#FDFDFD', '#FDFDFD', '#FDFDFD', '#FDFDFD', '#FDFDFD', '#FDFDFD', '#FDFDFD', '#FDFDFD', '#FDFDFD', '#FDFDFD', '#FDFDFD', '#FDFDFD', '#EEEEEE', '#EEEEEE', '#FDFDFD', '#FDFDFD', '#EEEEEE', '#EEEEEE', '#EEEEEE', '#EEEEEE', '#FDFDFD', '#FDFDFD']
+            }
+          }
+        },
+        series: [
+          {
+            name: 'Placeholder',
+            type: 'bar',
+            stack: 'Total',
+            itemStyle: {
+              borderColor: 'transparent',
+              color: 'transparent'
+            },
+            emphasis: {
+              itemStyle: {
+                borderColor: 'transparent',
+                color: 'transparent'
+              }
+            },
+            markLine: {
+              data: [
+                {
+                  name: '平均入睡时间',
+                  type: 'average',
+                  lineStyle: {
+                    color: "#FF0000"
+                  }
+                }
+              ],
+              label: {
+                show: true,
+                formatter: (params) => {
+                  // params.value 为ECharts自动计算的平均值
+                  const avgValue = params.value;
+                  return `平均入睡时间: ${formatTime(avgValue)}`;
+                }
+              }
+            },
+            data: chartData.times // 你的数据
+          },
+          {
+            name: '睡眠时长',
+            type: 'bar',
+            stack: 'Total',
+            emphasis: {
+              focus: 'series',
+              blurScope: 'coordinateSystem'
+            },
+            label: {
+              show: true,
+              position: 'inside'
+            },
+            data: chartData.sleepDurations // 你的数据
+          },
+          {
+            name: 'Placeholder22',
+            type: 'bar',
+            stack: 'Total',
+            itemStyle: {
+              borderColor: '#FFFFFF',
+              color: '#FFFFFF'
+            },
+            emphasis: {
+              itemStyle: {
+                borderColor: '#FFFFFF',
+                color: '#FFFFFF'
+              }
+            },
+            markLine: {
+              data: [
+                {
+                  name: '平均起床时间',
+                  type: 'average',
+                  lineStyle: {
+                    color: "#48B263"
+                  }
+                }
+              ],
+              label: {
+                show: true,
+                formatter: (params) => {
+                  // params.value 为ECharts自动计算的平均值
+                  const avgValue = params.value;
+                  return `平均起床时间: ${formatTime(avgValue)}`;
+                }
+              }
+            },
+            data: chartData.help // 你的数据
+          }
+        ]
+      };
+
+      if (option && typeof option === 'object') {
+        myChart.setOption(option);
+      }
+    }
+
+    function formatTime(value) {
+      const totalMinutes = Math.round(value * 60);
+      const hours = Math.floor(totalMinutes / 60) % 24;
+      const minutes = totalMinutes % 60;
+      return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+    }
+
+  </script>
+</body>
+</html>
